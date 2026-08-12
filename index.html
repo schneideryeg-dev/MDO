@@ -225,9 +225,12 @@ const FILTER_DEFS = [
   { field: 'priority', label: 'Priority', values: PRIORITY_VALUES, selectedSet: selectedPriority, classFn: priorityClass }
 ];
 
-function initiativeHasValue(init, field, selectedSet){
-  if(selectedSet.size === 0) return true;
-  return init.details.some(d => selectedSet.has(d[field]));
+function detailMatchesFilters(d){
+  return FILTER_DEFS.every(def => def.selectedSet.size === 0 || def.selectedSet.has(d[def.field]));
+}
+
+function initiativeHasMatchingDetail(init){
+  return init.details.some(d => detailMatchesFilters(d));
 }
 
 function closeAllDropdowns(){
@@ -309,10 +312,7 @@ function renderMain(){
   categories.forEach(cat=>{
     const list = initiatives.filter(i=>
       i.category===cat &&
-      initiativeHasValue(i, 'status', selectedStatus) &&
-      initiativeHasValue(i, 'targetYear', selectedYear) &&
-      initiativeHasValue(i, 'erpImpact', selectedImpact) &&
-      initiativeHasValue(i, 'priority', selectedPriority) &&
+      initiativeHasMatchingDetail(i) &&
       (searchTerm === '' ||
         i.name.toLowerCase().includes(searchTerm) ||
         i.details.some(d=>d.detail.toLowerCase().includes(searchTerm)))
@@ -363,14 +363,18 @@ function detailItem(d){
 function openDrawer(id){
   const i = initIndex[id];
   if(!i) return;
+  const anyFilterActive = FILTER_DEFS.some(def => def.selectedSet.size > 0);
+  const shownDetails = anyFilterActive ? i.details.filter(d => detailMatchesFilters(d)) : i.details;
+  const hiddenCount = i.details.length - shownDetails.length;
   const content = document.getElementById('drawerContent');
   content.innerHTML =
     '<div class="drawer-eyebrow">'+i.category+'</div>'+
     '<h2>'+i.name+'</h2>'+
-    '<div class="drawer-sub">'+i.details.length+' detail line'+(i.details.length===1?'':'s')+'</div>'+
+    '<div class="drawer-sub">'+shownDetails.length+' of '+i.details.length+' detail line'+(i.details.length===1?'':'s')+
+      (hiddenCount > 0 ? ' shown (filtered by current selection)' : '')+'</div>'+
     '<div class="related-title">Detail lines</div>'+
     '<ul class="detail-list">'+
-      i.details.map(d=>detailItem(d)).join('')+
+      shownDetails.map(d=>detailItem(d)).join('')+
     '</ul>';
   document.getElementById('drawer').classList.add('open');
   document.getElementById('backdrop').classList.add('open');
